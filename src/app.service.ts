@@ -37,11 +37,6 @@ export class AppService {
         mergeAttrs: true,
         explicitArray: false,
       });
-      this.logger.log({
-        jobs: data.length,
-        message: 'Successfully fetched jobs',
-      });
-
       const isMatched = (dateString) => {
         const date = new Date(dateString);
         return isToday(date);
@@ -54,9 +49,15 @@ export class AppService {
         .filter(
           (e) => isMatched(e.pubDate) && !this.notifiedUrls.includes(e.slug),
         );
+      this.logger.log({
+        message: `Jobs Matched: ${jobsToday.length}`,
+      });
       if (jobsToday.length) {
         await fetch(this.appConfig.pushcutUrl);
         this.notifiedUrls.push(...jobsToday.map((e) => e.slug));
+        this.logger.log({
+          message: `Push notification sent`,
+        });
         if (!isToday(this.lastCheckedDate)) {
           this.lastCheckedDate = new Date();
           this.notifiedUrls = [];

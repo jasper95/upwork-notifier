@@ -3,7 +3,7 @@ import { ConfigType } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { applicationConfig } from './config';
 import * as xml2js from 'xml2js';
-import { isToday } from 'date-fns';
+import { isToday, isYesterday } from 'date-fns';
 import * as nodemailer from 'nodemailer';
 import Mail from 'nodemailer/lib/mailer';
 
@@ -39,7 +39,7 @@ export class AppService {
       });
       const isMatched = (dateString) => {
         const date = new Date(dateString);
-        return isToday(date);
+        return isToday(date) || isYesterday(date);
       };
       const jobsToday = data.rss.channel.item
         .map((e) => ({

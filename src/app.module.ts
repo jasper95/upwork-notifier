@@ -3,6 +3,7 @@ import { AppService } from './app.service';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
 import { applicationConfig, validationSchema } from './config';
+import { AppController } from './app.controller';
 
 @Module({
   imports: [
@@ -13,7 +14,7 @@ import { applicationConfig, validationSchema } from './config';
       isGlobal: true,
     }),
   ],
-  controllers: [],
+  controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule {}

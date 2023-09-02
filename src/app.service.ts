@@ -28,7 +28,7 @@ export class AppService {
 
   private readonly logger = new Logger(AppService.name);
 
-  @Cron(CronExpression.EVERY_5_SECONDS)
+  @Cron(CronExpression.EVERY_MINUTE)
   async handleCron() {
     try {
       const response = await fetch(this.appConfig.rssUrl);

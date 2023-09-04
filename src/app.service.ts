@@ -3,13 +3,14 @@ import { ConfigType } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { applicationConfig } from './config';
 import * as xml2js from 'xml2js';
-import { isToday, isYesterday } from 'date-fns';
 import * as nodemailer from 'nodemailer';
 import Mail from 'nodemailer/lib/mailer';
+import OpenAI from 'openai';
 
 @Injectable()
 export class AppService {
   private transporter: nodemailer.Transporter;
+  private openai: OpenAI;
   constructor(
     @Inject(applicationConfig.KEY)
     private readonly appConfig: ConfigType<typeof applicationConfig>,
@@ -21,10 +22,13 @@ export class AppService {
         pass: this.appConfig.nodemailer.pass,
       },
     });
+    this.openai = new OpenAI({
+      apiKey: this.appConfig.openaiKey,
+    });
   }
 
-  private notifiedUrls: string[] = [];
-  private lastCheckedDate = new Date();
+  private latestJob;
+  private lastGeneratedProposal;
 
   private readonly logger = new Logger(AppService.name);
 
@@ -37,31 +41,19 @@ export class AppService {
         mergeAttrs: true,
         explicitArray: false,
       });
-      const isMatched = (dateString) => {
-        const date = new Date(dateString);
-        return isToday(date) || isYesterday(date);
-      };
-      const jobsToday = data.rss.channel.item
+
+      const [latestJob] = data.rss.channel.item
         .map((e) => ({
           ...e,
           slug: new URL(decodeURIComponent(e.link)).pathname.split('/').pop(),
         }))
-        .filter(
-          (e) => isMatched(e.pubDate) && !this.notifiedUrls.includes(e.slug),
-        );
+        .slice(0, 1);
       this.logger.log({
-        message: `Jobs Matched: ${jobsToday.length}`,
+        message: `Latest Job: ${JSON.stringify(latestJob)}`,
       });
-      if (jobsToday.length) {
+      if (this.latestJob?.slug !== latestJob.slug) {
+        this.latestJob = latestJob;
         await fetch(this.appConfig.pushcutUrl);
-        this.notifiedUrls.push(...jobsToday.map((e) => e.slug));
-        this.logger.log({
-          message: `Push notification sent`,
-        });
-        if (!isToday(this.lastCheckedDate)) {
-          this.lastCheckedDate = new Date();
-          this.notifiedUrls = [];
-        }
       }
     } catch (error) {
       this.logger.error('Failed to fetch jobs', error.stack);
@@ -78,5 +70,48 @@ export class AppService {
   async sendEmail(mail: Mail.Options) {
     await this.transporter.sendMail(mail);
     this.logger.log('Email successfully sent');
+  }
+
+  async getLatestJobProposal() {
+    if (!this.latestJob) {
+      return {};
+    }
+    if (
+      this.lastGeneratedProposal &&
+      this.lastGeneratedProposal.job.slug === this.latestJob
+    ) {
+      return this.lastGeneratedProposal;
+    }
+
+    const content = `
+      Generate a proposal based on a job description, my skills and my previous proposal.
+      Include in the proposal my name is Jasper Bernales.
+
+      Job Description:
+      ${this.latestJob.description}
+
+      My skills:
+      TypeScript Fullstack developer (INVITES ONLY - LONG TERM CONTRACTS)
+      Frontend: React | Vue | Angular 2+ | Next | Material UI | Tailwind | Bootstrap | GraphQL (apollo/react-query/swr/urql) | Redux
+      Backend: NodeJS | NestJS | MongoDB | Postgres | MySQL | Apollo Server | Hasura GraphQL engine | AWS Lambda | Amplify | API Gateway | AppSync | CDK | SAM | serverless
+      Payment Integration: Stripe | Plaid
+
+      previous proposal:
+      ${this.appConfig.previousProposal}
+
+      proposal:
+    `;
+    const params: OpenAI.Chat.ChatCompletionCreateParams = {
+      messages: [{ role: 'user', content }],
+      model: 'gpt-4',
+      temperature: 0.7,
+      top_p: 0.8,
+    };
+    const completion = await this.openai.chat.completions.create(params);
+    this.lastGeneratedProposal = {
+      proposal: completion.choices[0]?.message?.content,
+      job: this.latestJob,
+    };
+    return this.lastGeneratedProposal;
   }
 }

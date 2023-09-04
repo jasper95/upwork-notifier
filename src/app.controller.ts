@@ -1,9 +1,17 @@
 import { Controller, Get } from '@nestjs/common';
+import { AppService } from './app.service';
 
-@Controller('health-check')
+@Controller()
 export class AppController {
-  @Get()
+  constructor(private readonly appService: AppService) {}
+
+  @Get('health-check')
   healthCheck(): string {
     return 'Running';
+  }
+
+  @Get('latest-proposal')
+  generateLatestJobProposal() {
+    return this.appService.getLatestJobProposal();
   }
 }

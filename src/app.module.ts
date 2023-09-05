@@ -4,6 +4,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
 import { applicationConfig, validationSchema } from './config';
 import { AppController } from './app.controller';
+import { CacheModule } from '@nestjs/cache-manager';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { AppController } from './app.controller';
       load: [applicationConfig],
       isGlobal: true,
     }),
+    CacheModule.register(),
   ],
   controllers: [AppController],
   providers: [AppService],

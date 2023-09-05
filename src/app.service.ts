@@ -6,6 +6,8 @@ import * as xml2js from 'xml2js';
 import * as nodemailer from 'nodemailer';
 import Mail from 'nodemailer/lib/mailer';
 import OpenAI from 'openai';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 
 @Injectable()
 export class AppService {
@@ -14,6 +16,7 @@ export class AppService {
   constructor(
     @Inject(applicationConfig.KEY)
     private readonly appConfig: ConfigType<typeof applicationConfig>,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {
     this.transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -112,6 +115,15 @@ export class AppService {
       proposal: completion.choices[0]?.message?.content,
       job: this.latestJob,
     };
+    await this.cacheManager.set(
+      this.latestJob.slug,
+      this.lastGeneratedProposal,
+    );
     return this.lastGeneratedProposal;
+  }
+
+  async getProposalBySlug(slug: string) {
+    const cachedProposal = await this.cacheManager.get(slug);
+    return cachedProposal || {};
   }
 }
